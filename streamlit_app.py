@@ -7,12 +7,10 @@ from snowflake.snowpark.functions import col
 cnx = st.connection("snowflake")
 session =cnx.session()
 
-
 # Streamlit App Title
 st.title("Welcome to the Gen Z Navigator")
 
 # Create a sidebar with options
-
 st.sidebar.header("Navigation")
 st.sidebar.markdown(
     """
@@ -22,6 +20,7 @@ st.sidebar.markdown(
     - **Employer Registration**: If you are an employer looking to hire youth, register your organization and view youth profiles.
     """
 )
+
 option = st.sidebar.selectbox("Select an Option", ["Youth Registration", "Employer Registration"])
 
 # Youth Registration Section
@@ -48,15 +47,25 @@ if option == "Youth Registration":
             st.error("Please fill in all required fields!")
         else:
             try:
-                # Insert into Snowflake table using parameterized query
-                insert_stmt = """
-                    INSERT INTO SFHACKTON.PUBLIC.APPLICANTS 
-                    (NAME, AGE, STATE, DISTRICT, EDUCATION, EMAIL, CONTACT, ADHAAR_NUMBER, INTERESTS, SKILLS, AVAILABILITY)
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                # Check if the applicant already exists by Aadhaar, Email, or Contact
+                check_duplicate_stmt = f"""
+                    SELECT * FROM SFHACKTON.PUBLIC.APPLICANTS 
+                    WHERE ADHAAR_NUMBER = '{aadhaar}' OR EMAIL = '{email}' OR CONTACT = '{contact}'
                 """
-                session.sql(insert_stmt, (name, age, state, district, education, email, contact, aadhaar, interests, skills, availability)).collect()
+                duplicate_check = session.sql(check_duplicate_stmt).collect()
 
-                st.success(f'Your information has been submitted successfully, {name}!', icon="✅")
+                if duplicate_check:
+                    st.error(f"An applicant with the same Aadhaar Number, Email, or Contact Information already exists.")
+                else:
+                    # If no duplicates, insert the new applicant's data
+                    insert_stmt = """
+                        INSERT INTO SFHACKTON.PUBLIC.APPLICANTS 
+                        (NAME, AGE, STATE, DISTRICT, EDUCATION, EMAIL, CONTACT, ADHAAR_NUMBER, INTERESTS, SKILLS, AVAILABILITY)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """
+                    session.sql(insert_stmt, (name, age, state, district, education, email, contact, aadhaar, interests, skills, availability)).collect()
+
+                    st.success(f'Your information has been submitted successfully, {name}!', icon="✅")
 
             except Exception as error:
                 st.error(f"An error occurred: {error}")
